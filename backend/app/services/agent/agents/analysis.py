@@ -759,10 +759,21 @@ Final Answer:""",
             # 标准化发现
             logger.info(f"[{self.name}] Standardizing {len(all_findings)} findings")
             standardized_findings = []
+            skipped_no_filepath = 0
             for finding in all_findings:
                 # 确保 finding 是字典
                 if not isinstance(finding, dict):
                     logger.warning(f"Skipping invalid finding (not a dict): {finding}")
+                    continue
+                
+                # 🔥 v2.2: file_path 必填校验 - 没有 file_path 的 finding 直接拒绝
+                file_path = finding.get("file_path", "") or ""
+                if not file_path.strip():
+                    skipped_no_filepath += 1
+                    logger.warning(
+                        f"[Analysis] 🚫 跳过无 file_path 的 finding: "
+                        f"title={finding.get('title', '?')[:50]}, type={finding.get('vulnerability_type', '?')}"
+                    )
                     continue
                     
                 standardized = {
@@ -770,7 +781,7 @@ Final Answer:""",
                     "severity": finding.get("severity", "medium"),
                     "title": finding.get("title", "Unknown Finding"),
                     "description": finding.get("description", ""),
-                    "file_path": finding.get("file_path", ""),
+                    "file_path": file_path,
                     "line_start": finding.get("line_start") or finding.get("line", 0),
                     "code_snippet": finding.get("code_snippet", ""),
                     "source": finding.get("source", ""),
@@ -780,6 +791,12 @@ Final Answer:""",
                     "needs_verification": finding.get("needs_verification", True),
                 }
                 standardized_findings.append(standardized)
+            
+            if skipped_no_filepath > 0:
+                logger.warning(
+                    f"[Analysis] ⚠️ 跳过了 {skipped_no_filepath} 个无 file_path 的 findings，"
+                    f"保留 {len(standardized_findings)} 个有效 findings"
+                )
             
             await self.emit_event(
                 "info",

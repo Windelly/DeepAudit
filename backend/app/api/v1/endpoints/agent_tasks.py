@@ -1264,8 +1264,16 @@ async def _save_findings(
             file_path = (
                 finding.get("file_path") or
                 finding.get("file") or
-                finding.get("location", "").split(":")[0] if ":" in finding.get("location", "") else finding.get("location")
+                (finding.get("location", "").split(":")[0] if ":" in finding.get("location", "") else finding.get("location", ""))
             )
+
+            # 🔥 v2.2: file_path 为空直接跳过
+            if not file_path or not file_path.strip():
+                logger.warning(
+                    f"[SaveFindings] 🚫 跳过无 file_path 的 finding: "
+                    f"title={finding.get('title', 'N/A')[:50]}, type={finding.get('vulnerability_type', '?')}"
+                )
+                continue
 
             # 🔥 v2.1: 文件路径验证 - 过滤幻觉发现
             if project_root and file_path:
@@ -1336,7 +1344,8 @@ async def _save_findings(
 
             # 🔥 Handle verification status
             is_verified = finding.get("is_verified", False)
-            if finding.get("verdict") == "confirmed":
+            verdict = finding.get("verdict")  # confirmed / likely / uncertain / false_positive
+            if verdict == "confirmed":
                 is_verified = True
 
             # 🔥 Handle PoC information
@@ -1381,6 +1390,7 @@ async def _save_findings(
                 code_snippet=code_snippet[:10000] if code_snippet else None,
                 suggestion=suggestion[:5000] if suggestion else None,
                 is_verified=is_verified,
+                verdict=verdict,  # 🔥 新增：保存 verdict 到数据库
                 ai_confidence=confidence,  # 🔥 FIX: Use ai_confidence, not confidence
                 status=FindingStatus.VERIFIED if is_verified else FindingStatus.NEW,
                 # 🔥 Additional fields
