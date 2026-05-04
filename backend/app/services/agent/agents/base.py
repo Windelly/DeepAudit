@@ -1048,6 +1048,11 @@ class BaseAgent(ABC):
                         accumulated = chunk["content"]
                         if chunk.get("usage"):
                             total_tokens = chunk["usage"].get("total_tokens", 0)
+                        # 🔥 记录推理模型的 reasoning 统计
+                        reasoning = chunk.get("reasoning_content", "")
+                        reasoning_tokens_est = chunk.get("reasoning_tokens", 0)
+                        if reasoning:
+                            logger.info(f"[{self.name}] reasoning_content: {len(reasoning)} chars, ~{reasoning_tokens_est} tokens")
                         break
 
                     elif chunk["type"] == "error":
