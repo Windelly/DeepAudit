@@ -307,7 +307,7 @@ class LiteLLMAdapter(BaseLLMAdapter):
         # 🔥 FALLBACK: 推理模型（DeepSeek V4 Pro 等）可能将全部输出放在 reasoning_content，content 为空
         final_content = choice.message.content or ""
         if not final_content.strip() and reasoning_content.strip():
-            logger.warning(f"[reasoning-fallback] model={response.model}, content empty, falling back to reasoning_content ({len(reasoning_content)} chars)")
+            logger.info(f"[reasoning-fallback] model={response.model}, content empty, falling back to reasoning_content ({len(reasoning_content)} chars)")
             final_content = reasoning_content
 
         return LLMResponse(
@@ -410,7 +410,15 @@ class LiteLLMAdapter(BaseLLMAdapter):
 
                 if finish_reason:
                     # 流式完成
-                    # 🔥 如果没有从 chunk 获取到 usage，进行估算
+                    # 🔥 FALLBACK: 推理模型可能将全部输出放在 reasoning_content，content 为空
+                    # 必须在 token 估算之前执行，确保估算基于最终 content
+                    if not accumulated_content.strip() and accumulated_reasoning.strip():
+                        logger.info(f"[reasoning-fallback-stream] model={self.config.model}, content empty after {chunk_count} chunks, falling back to reasoning_content ({len(accumulated_reasoning)} chars)")
+                        accumulated_content = accumulated_reasoning
+                    elif not accumulated_content:
+                        logger.warning(f"Stream completed with no content after {chunk_count} chunks, finish_reason={finish_reason}")
+
+                    # 🔥 如果没有从 chunk 获取到 usage，进行估算（基于最终 content）
                     if not final_usage:
                         output_tokens_estimate = estimate_tokens(
                             accumulated_content, self.config.model
@@ -421,13 +429,6 @@ class LiteLLMAdapter(BaseLLMAdapter):
                             "total_tokens": input_tokens_estimate + output_tokens_estimate,
                         }
                         logger.debug(f"Estimated usage: {final_usage}")
-
-                    # 🔥 FALLBACK: 推理模型可能将全部输出放在 reasoning_content，content 为空
-                    if not accumulated_content.strip() and accumulated_reasoning.strip():
-                        logger.warning(f"[reasoning-fallback-stream] model={self.config.model}, content empty after {chunk_count} chunks, falling back to reasoning_content ({len(accumulated_reasoning)} chars)")
-                        accumulated_content = accumulated_reasoning
-                    elif not accumulated_content:
-                        logger.warning(f"Stream completed with no content after {chunk_count} chunks, finish_reason={finish_reason}")
 
                     # 🔥 记录推理内容长度
                     reasoning_tokens_est = len(accumulated_reasoning) // 2 if accumulated_reasoning else 0
@@ -446,8 +447,9 @@ class LiteLLMAdapter(BaseLLMAdapter):
 
             # 🔥 ENHANCED: 如果循环结束但没有收到 finish_reason，也需要返回 done
             # 🔥 FALLBACK: 推理模型 content 为空时回退到 reasoning_content
+            # 必须在 token 估算之前执行，确保估算基于最终 content
             if not accumulated_content.strip() and accumulated_reasoning.strip():
-                logger.warning(f"[reasoning-fallback-stream] model={self.config.model}, stream ended without finish_reason, falling back to reasoning_content ({len(accumulated_reasoning)} chars)")
+                logger.info(f"[reasoning-fallback-stream] model={self.config.model}, stream ended without finish_reason, falling back to reasoning_content ({len(accumulated_reasoning)} chars)")
                 accumulated_content = accumulated_reasoning
             if accumulated_content:
                 logger.warning(f"Stream ended without finish_reason, returning accumulated content ({len(accumulated_content)} chars)")
