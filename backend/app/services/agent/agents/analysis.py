@@ -767,7 +767,11 @@ Final Answer:""",
                     continue
                 
                 # 🔥 v2.2: file_path 必填校验 - 没有 file_path 的 finding 直接拒绝
-                file_path = finding.get("file_path", "") or ""
+                # 优先从 file_path 获取，fallback 到 file / location
+                file_path = finding.get("file_path") or finding.get("file") or ""
+                if not file_path.strip() and finding.get("location"):
+                    loc = finding.get("location", "")
+                    file_path = loc.split(":")[0] if ":" in loc else loc
                 if not file_path.strip():
                     skipped_no_filepath += 1
                     logger.warning(

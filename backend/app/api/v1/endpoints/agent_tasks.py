@@ -194,6 +194,7 @@ class AgentFindingResponse(BaseModel):
     status: str
     
     suggestion: Optional[str] = None
+    verdict: Optional[str] = None
     poc: Optional[dict] = None
     
     created_at: datetime
