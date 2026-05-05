@@ -567,35 +567,46 @@ async def _execute_agent_task(task_id: str):
                 # files_with_findings = 有漏洞发现的唯一文件数
                 task.analyzed_files = task.total_files  # Agent 扫描了所有符合条件的文件
 
-                files_with_findings_set = set()
+                # 🔥 FIX: 先过滤 findings，再用过滤后的列表做统计
+                # 与 _save_findings 的过滤逻辑保持一致（排除无 file_path 的 finding）
+                filtered_findings = []
                 for f in findings:
-                    if isinstance(f, dict):
-                        file_path = f.get("file_path") or f.get("file") or f.get("location", "").split(":")[0]
-                        if file_path:
-                            files_with_findings_set.add(file_path)
+                    if not isinstance(f, dict):
+                        continue
+                    fp = f.get("file_path") or f.get("file") or ""
+                    if not fp.strip() and f.get("location"):
+                        loc = f.get("location", "")
+                        fp = loc.split(":")[0] if ":" in loc else loc
+                    if fp and fp.strip():
+                        filtered_findings.append(f)
+
+                files_with_findings_set = set()
+                for f in filtered_findings:
+                    file_path = f.get("file_path") or f.get("file") or f.get("location", "").split(":")[0]
+                    if file_path:
+                        files_with_findings_set.add(file_path)
                 task.files_with_findings = len(files_with_findings_set)
 
-                # 统计严重程度和验证状态
+                # 统计严重程度和验证状态（使用过滤后的列表）
                 verified_count = 0
-                for f in findings:
-                    if isinstance(f, dict):
-                        sev = str(f.get("severity", "low")).lower()
-                        if sev == "critical":
-                            task.critical_count += 1
-                        elif sev == "high":
-                            task.high_count += 1
-                        elif sev == "medium":
-                            task.medium_count += 1
-                        elif sev == "low":
-                            task.low_count += 1
-                        # 🔥 统计已验证的发现
-                        if f.get("is_verified") or f.get("verdict") == "confirmed":
-                            verified_count += 1
+                for f in filtered_findings:
+                    sev = str(f.get("severity", "low")).lower()
+                    if sev == "critical":
+                        task.critical_count += 1
+                    elif sev == "high":
+                        task.high_count += 1
+                    elif sev == "medium":
+                        task.medium_count += 1
+                    elif sev == "low":
+                        task.low_count += 1
+                    # 🔥 统计已验证的发现
+                    if f.get("is_verified") or f.get("verdict") == "confirmed":
+                        verified_count += 1
                 task.verified_count = verified_count
                 
-                # 计算安全评分
-                task.security_score = _calculate_security_score(findings)
-                task.quality_score = _calculate_security_score(findings)
+                # 计算安全评分（使用过滤后的列表）
+                task.security_score = _calculate_security_score(filtered_findings)
+                task.quality_score = _calculate_security_score(filtered_findings)
                 # 🔥 注意: progress_percentage 是计算属性，不需要手动设置
                 # 当 status = COMPLETED 时会自动返回 100.0
                 
@@ -1262,10 +1273,12 @@ async def _save_findings(
                 type_enum = VulnerabilityType.DESERIALIZATION
 
             # 🔥 Handle file path (support multiple field names)
+            raw_location = finding.get("location")
+            location_str = raw_location if isinstance(raw_location, str) else ""
             file_path = (
                 finding.get("file_path") or
                 finding.get("file") or
-                (finding.get("location", "").split(":")[0] if ":" in finding.get("location", "") else finding.get("location", ""))
+                (location_str.split(":")[0] if ":" in location_str else location_str)
             )
 
             # 🔥 v2.2: file_path 为空直接跳过
@@ -1293,9 +1306,9 @@ async def _save_findings(
 
             # 🔥 Handle line numbers (support multiple formats)
             line_start = finding.get("line_start") or finding.get("line")
-            if not line_start and ":" in finding.get("location", ""):
+            if not line_start and ":" in location_str:
                 try:
-                    line_start = int(finding.get("location", "").split(":")[1])
+                    line_start = int(location_str.split(":")[1])
                 except (ValueError, IndexError):
                     line_start = None
 

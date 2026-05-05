@@ -18,7 +18,9 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column('agent_findings', sa.Column('verdict', sa.String(length=30), nullable=True))
+    op.create_index('ix_agent_findings_verdict', 'agent_findings', ['verdict'])
 
 
 def downgrade() -> None:
+    op.drop_index('ix_agent_findings_verdict', table_name='agent_findings')
     op.drop_column('agent_findings', 'verdict')

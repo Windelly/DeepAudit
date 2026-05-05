@@ -771,7 +771,15 @@ Final Answer:""",
                 file_path = finding.get("file_path") or finding.get("file") or ""
                 if not file_path.strip() and finding.get("location"):
                     loc = finding.get("location", "")
-                    file_path = loc.split(":")[0] if ":" in loc else loc
+                    if isinstance(loc, str):
+                        file_path = loc.split(":")[0] if ":" in loc else loc
+                    else:
+                        # location 是非字符串类型（dict/list 等），跳过
+                        logger.warning(
+                            f"[Analysis] 🚫 跳过 location 非字符串的 finding: "
+                            f"location type={type(loc).__name__}, title={finding.get('title', '?')[:50]}"
+                        )
+                        continue
                 if not file_path.strip():
                     skipped_no_filepath += 1
                     logger.warning(

@@ -933,6 +933,8 @@ Action Input: {{"参数": "值"}}
                     for new_f in valid_findings:
                         # Normalize the finding first
                         normalized_new = self._normalize_finding(new_f)
+                        if not normalized_new:
+                            continue
 
                         # Create fingerprint for deduplication (file + description similarity)
                         new_file = normalized_new.get("file_path", "").lower().strip()
