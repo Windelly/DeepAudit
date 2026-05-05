@@ -413,6 +413,8 @@ class LiteLLMAdapter(BaseLLMAdapter):
                         "content": content,
                         "accumulated": accumulated_content,
                     }
+                elif reasoning and not finish_reason:
+                    yield {"type": "keepalive"}
                 # 🔥 ENHANCED: 处理没有 content 但也没有 finish_reason 的情况
                 # 某些模型（如智谱 GLM）可能在某些 chunk 中不返回内容
 
