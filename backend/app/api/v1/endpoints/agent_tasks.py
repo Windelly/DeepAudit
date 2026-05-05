@@ -571,20 +571,15 @@ async def _execute_agent_task(task_id: str):
                 # 与 _save_findings 的过滤逻辑保持一致（排除无 file_path 的 finding）
                 filtered_findings = []
                 for f in findings:
-                    if not isinstance(f, dict):
-                        continue
-                    fp = f.get("file_path") or f.get("file") or ""
-                    if not fp.strip() and f.get("location"):
-                        loc = f.get("location", "")
-                        fp = loc.split(":")[0] if ":" in loc else loc
-                    if fp and fp.strip():
-                        filtered_findings.append(f)
-
-                files_with_findings_set = set()
-                for f in filtered_findings:
-                    file_path = f.get("file_path") or f.get("file") or f.get("location", "").split(":")[0]
-                    if file_path:
-                        files_with_findings_set.add(file_path)
+                    if isinstance(f, dict):
+                        raw_file_path = f.get("file_path") or f.get("file")
+                        file_path = raw_file_path if isinstance(raw_file_path, str) else ""
+                        if not file_path:
+                            raw_location = f.get("location", "")
+                            location = raw_location if isinstance(raw_location, str) else ""
+                            file_path = location.split(":")[0]
+                        if file_path:
+                            files_with_findings_set.add(file_path)
                 task.files_with_findings = len(files_with_findings_set)
 
                 # 统计严重程度和验证状态（使用过滤后的列表）
@@ -1273,13 +1268,12 @@ async def _save_findings(
                 type_enum = VulnerabilityType.DESERIALIZATION
 
             # 🔥 Handle file path (support multiple field names)
-            raw_location = finding.get("location")
-            location_str = raw_location if isinstance(raw_location, str) else ""
-            file_path = (
-                finding.get("file_path") or
-                finding.get("file") or
-                (location_str.split(":")[0] if ":" in location_str else location_str)
-            )
+            raw_file_path = finding.get("file_path") or finding.get("file")
+            file_path = raw_file_path if isinstance(raw_file_path, str) else ""
+            if not file_path:
+                raw_location = finding.get("location", "")
+                location = raw_location if isinstance(raw_location, str) else ""
+                file_path = location.split(":")[0] if ":" in location else location
 
             # 🔥 v2.2: file_path 为空直接跳过
             if not file_path or not file_path.strip():
@@ -1306,9 +1300,11 @@ async def _save_findings(
 
             # 🔥 Handle line numbers (support multiple formats)
             line_start = finding.get("line_start") or finding.get("line")
-            if not line_start and ":" in location_str:
+            raw_location = finding.get("location", "")
+            location = raw_location if isinstance(raw_location, str) else ""
+            if not line_start and ":" in location:
                 try:
-                    line_start = int(location_str.split(":")[1])
+                    line_start = int(location.split(":")[1])
                 except (ValueError, IndexError):
                     line_start = None
 

@@ -970,7 +970,7 @@ Action Input: {{"参数": "值"}}
                                 match_found = True
                             elif same_type and same_line and not same_file:
                                 # 🔥 FIX: Only allow cross-file matching when:
-                                # 1. new_file is garbage ("?"/empty) - verification returned bad path
+                                # 1. new_file is garbage ("?"/empty) and descriptions still match
                                 # 2. One path is a prefix of the other ("src/foo.py" vs "foo.py")
                                 # Do NOT merge when existing_file is garbage - that would lose the real path.
                                 new_is_garbage = not new_file or new_file == "?"
@@ -978,7 +978,7 @@ Action Input: {{"参数": "值"}}
                                     new_file.endswith("/" + existing_file) or
                                     existing_file.endswith("/" + new_file)
                                 )
-                                if new_is_garbage or prefix_match:
+                                if (new_is_garbage and similar_desc) or prefix_match:
                                     match_found = True
                                     logger.info(f"[Orchestrator] Matched by type+line despite file mismatch: {new_file} vs {existing_file}")
                                 else:
