@@ -570,6 +570,7 @@ async def _execute_agent_task(task_id: str):
                 # 🔥 FIX: 先过滤 findings，再用过滤后的列表做统计
                 # 与 _save_findings 的过滤逻辑保持一致（排除无 file_path 的 finding）
                 filtered_findings = []
+                files_with_findings_set = set()
                 for f in findings:
                     if isinstance(f, dict):
                         raw_file_path = f.get("file_path") or f.get("file")
@@ -580,6 +581,7 @@ async def _execute_agent_task(task_id: str):
                             file_path = location.split(":")[0]
                         if file_path:
                             files_with_findings_set.add(file_path)
+                            filtered_findings.append(f)
                 task.files_with_findings = len(files_with_findings_set)
 
                 # 统计严重程度和验证状态（使用过滤后的列表）
